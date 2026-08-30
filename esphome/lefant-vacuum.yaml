@@ -1,0 +1,128 @@
+# Lefant M210P. Replaces the Tuya WBR3 with an ESP-12F on the same footprint.
+# UART0 (GPIO1/GPIO3) is the serial link to the vacuum's MCU, so the serial
+# logger must stay disabled.
+
+substitutions:
+  device_name: lefant-vacuum
+  friendly_name: Lefant M210P
+  # Compiled in, so it cannot be raised at runtime. Override with
+  # -s log_level VERBOSE to expose the raw Tuya frame exchange.
+  log_level: DEBUG
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: esp12e
+  restore_from_flash: true
+
+logger:
+  baud_rate: 0
+  level: ${log_level}
+
+api:
+  encryption:
+    key: !secret lefant_api_key
+
+ota:
+  - platform: esphome
+    password: !secret lefant_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: lefant-fallback
+    password: !secret lefant_ap_password
+
+captive_portal:
+
+uart:
+  id: mcu_uart
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  # The MCU runs at 115200, not the 9600 that is typical for Tuya serial links.
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+tuya:
+  id: tuya_mcu
+  uart_id: mcu_uart
+  time_id: ha_time
+
+switch:
+  - platform: tuya
+    name: Power
+    switch_datapoint: 1
+  - platform: tuya
+    name: Return to dock
+    switch_datapoint: 2
+  - platform: tuya
+    name: Locate
+    switch_datapoint: 13
+
+select:
+  - platform: tuya
+    name: Mode
+    enum_datapoint: 3
+    optimistic: true
+    options:
+      0: standby
+      1: smart
+      2: chargego
+      3: random
+      4: wall_follow
+      5: spiral
+  - platform: tuya
+    name: Direction
+    enum_datapoint: 4
+    optimistic: true
+    options:
+      0: backward
+      1: turn_left
+      2: turn_right
+      3: stop
+
+sensor:
+  - platform: tuya
+    name: Battery
+    sensor_datapoint: 6
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+  - platform: tuya
+    name: Clean area
+    sensor_datapoint: 16
+    unit_of_measurement: m2
+    accuracy_decimals: 0
+  - platform: tuya
+    name: Clean time
+    sensor_datapoint: 17
+    unit_of_measurement: min
+    accuracy_decimals: 0
+  - platform: tuya
+    name: Fault code
+    sensor_datapoint: 18
+    accuracy_decimals: 0
+
+text_sensor:
+  - platform: template
+    name: MCU link state
+    id: mcu_link_state
+    entity_category: diagnostic
+    update_interval: 15s
+    lambda: |-
+      switch ((uint8_t) id(tuya_mcu)->get_init_state()) {
+        case 0: return std::string("heartbeat");
+        case 1: return std::string("product");
+        case 2: return std::string("conf");
+        case 3: return std::string("wifi");
+        case 4: return std::string("datapoint");
+        case 5: return std::string("done");
+        default: return std::string("unknown");
+      }
