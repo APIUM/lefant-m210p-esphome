@@ -53,13 +53,33 @@ tuya:
   id: tuya_mcu
   uart_id: mcu_uart
   time_id: ha_time
+  on_datapoint_update:
+    - sensor_datapoint: 5
+      datapoint_type: enum
+      then:
+        - text_sensor.template.publish:
+            id: activity
+            state: !lambda |-
+              switch (x) {
+                case 0: return std::string("paused");
+                case 1: return std::string("smart");
+                case 2: return std::string("wall_follow");
+                case 3: return std::string("spiral");
+                case 4: return std::string("returning");
+                case 5: return std::string("charging");
+                case 6: return std::string("random");
+                case 7: return std::string("standby");
+                default: return std::to_string((int) x);
+              }
 
 switch:
   - platform: tuya
     name: Power
     switch_datapoint: 1
+  # Datapoint 2 is Tuya's power_go, the cleaning switch. Returning to the dock
+  # is the chargego option on datapoint 3.
   - platform: tuya
-    name: Return to dock
+    name: Clean
     switch_datapoint: 2
   - platform: tuya
     name: Locate
@@ -86,6 +106,14 @@ select:
       1: turn_left
       2: turn_right
       3: stop
+  - platform: tuya
+    name: Fan speed
+    enum_datapoint: 101
+    optimistic: true
+    options:
+      0: low
+      1: medium
+      2: high
 
 sensor:
   - platform: tuya
@@ -111,6 +139,23 @@ sensor:
     accuracy_decimals: 0
 
 text_sensor:
+  # The MCU names the reason for each state change here, for example
+  # "Switch way:WHEEL SUP0" when it decides the drive wheels are off the floor.
+  - platform: tuya
+    name: Status message
+    sensor_datapoint: 107
+    entity_category: diagnostic
+  # Datapoint 108 rotates through several readings, for example
+  # "BatVol:07747" and "OBS:0008_0012_0003 Cliff:0006_0006_0011 WALL:000_008".
+  - platform: tuya
+    name: Sensor telemetry
+    sensor_datapoint: 108
+    entity_category: diagnostic
+  - platform: template
+    name: Activity
+    id: activity
+    entity_category: diagnostic
+    update_interval: never
   - platform: template
     name: MCU link state
     id: mcu_link_state

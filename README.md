@@ -57,18 +57,31 @@ on a manual rig.
 | DP | Code | Type | Notes |
 |---|---|---|---|
 | 1 | `power` | bool | |
-| 2 | `power_go` | bool | return to dock |
+| 2 | `power_go` | bool | Tuya's cleaning switch, start and stop |
 | 3 | `mode` | enum | standby, smart, chargego, random, wall_follow, spiral |
 | 4 | `direction_control` | enum | backward, turn_left, turn_right, stop |
-| 5 | ? | enum | undocumented |
+| 5 | `status` | enum | 0 paused, 1 smart, 2 wall_follow, 3 spiral, 4 returning, 5 charging, 6 random, 7 standby |
 | 6 | `electricity_left` | int | 0 to 100 % |
 | 13 | `seek` | bool | locate beep |
 | 16 | `clean_area` | int | m2 |
 | 17 | `clean_time` | int | min |
 | 18 | `fault` | bitmap | 23 bits |
 | 19 | ? | raw | `01:00:FF`, undocumented |
-| 101, 111 | ? | enum | undocumented |
+| 101 | fan speed | enum | low, medium, high |
+| 107 | status message | string | `Switch way:WHEEL SUP0` |
+| 108 | sensor telemetry | string | `BatVol:07747`, `OBS:... Cliff:... WALL:...` |
+| 111 | ? | enum | undocumented |
 | 112 | ? | switch | undocumented |
+
+Chargego on DP 3 is how you send it home. DP 108 rotates between a battery
+reading and the obstacle, cliff and wall sensors.
+
+DP 107 is the one worth having. The MCU names the reason for every state change
+there. A start that dies after 900 ms leaves `Switch way:WHEEL SUP0` behind, then
+raises fault bit 18, `0x040000`. It reckons the wheels are off the floor.
+
+Names for 5 and 101 are from [tuya-local's Lefant M213
+config](https://github.com/make-all/tuya-local/blob/main/custom_components/tuya_local/devices/lefant_m213_vacuum.yaml).
 
 ## Protocol
 
